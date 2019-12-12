@@ -5,6 +5,8 @@ import  json,datetime
 import re
 from fontTools.ttLib import TTFont
 import  os
+
+
 req_session = requests.session()
 
 headers={
@@ -76,12 +78,13 @@ def FirstLevelParse(res:requests.Response,domain = "https://maoyan.com"):
     """
     bs = BeautifulSoup(res.content, features="html.parser")
     links = bs.select("p.name a")
+    score_list = bs.select(".score")
     movielink_list = []
     for link in links:
         href =  domain+link["href"]
         movielink_list.append(href)
 
-    return movielink_list
+    return movielink_list,score_list
 
 
 def PaseMovieItem(item_str:str)->Movie:
@@ -89,11 +92,11 @@ def PaseMovieItem(item_str:str)->Movie:
     movie = Movie()
     bs = BeautifulSoup(item_str,features="html.parser")
     movie.tags = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > h3").string
-    score = bs.select_one(".movie-stats-container .score .info-num span.stonefont").string #.encode("utf-8")
-    cumulative_sales = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-stats-container > div:nth-child(2) > div").string
+    # score = bs.select_one(".movie-stats-container .score .info-num span.stonefont").string #.encode("utf-8")
+    # cumulative_sales = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-stats-container > div:nth-child(2) > div").string
 
-    movie.score = score
-    movie.cumulative_sales = cumulative_sales
+    # movie.score = score
+    # movie.cumulative_sales = cumulative_sales
     movie.tags = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > ul > li:nth-child(1)").string
     movie.name = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > h3").string
     movie.releasetime = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > ul > li:nth-child(3)").string
@@ -121,7 +124,7 @@ def PaseMovieItem(item_str:str)->Movie:
     movie.comments = comment_list
 
     return movie
-def SeconLevelParse(movies:list):
+def SeconLevelParse(movies:list,score_list:list):
 
     movie_list = []
     cnt = 0
@@ -133,6 +136,7 @@ def SeconLevelParse(movies:list):
            print(movie+" 请求错误" +str(res.status_code)+ str(res.request))
            continue
         movie_obj =  PaseMovieItem(res.text)
+        movie_obj.score = score_list[cnt-1].text
         movie_list.append(movie_obj)
 
     return  movie_list
@@ -146,9 +150,9 @@ def main():
     if response.status_code != 200:
         raise Exception("无法成功访问,请修改 cookie等参数")
 
-    movielink_list = FirstLevelParse(response)
+    movielink_list,score_list = FirstLevelParse(response)
 
-    movie_list =  SeconLevelParse(movielink_list)
+    movie_list =  SeconLevelParse(movielink_list,score_list)
 
     msg,res = WriteToJSON(movie_list)
     if res:
@@ -158,6 +162,10 @@ def main():
 
 
     # 数据统计分析
+
+
+def analysis_data(file:str):
+    pass
 
 if __name__ == '__main__':
     main()
