@@ -13,3 +13,6 @@ class Movie(object):
 
     def toJSON(self):
         return json.dumps(self,default=lambda o: o.__dict__)
+
+    def dict_to_object(self,dict):
+        self.__dict__.update(dict)

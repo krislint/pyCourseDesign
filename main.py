@@ -2,10 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from model import Movie,Comment
 import  json,datetime
-import re
-from fontTools.ttLib import TTFont
-import  os
-
+import statistics
 
 req_session = requests.session()
 
@@ -22,8 +19,11 @@ headers={
     "Connection":"keep-alive"
 }
 
+def generatorFileName()->str:
+    return datetime.datetime.now().strftime("%Y-%m-%d") + "maoyan.json";
+
 def WriteToJSON(obj)->(str,bool):
-    filename = datetime.datetime.now().strftime("%Y-%m-%d") + "maoyan.json"
+    filename =generatorFileName()
     try:
         with open(filename,"w",encoding="utf-8") as f:
             json_str = json.dumps(obj,default=lambda o:o.__dict__,ensure_ascii=False,indent=4)
@@ -32,42 +32,6 @@ def WriteToJSON(obj)->(str,bool):
         return  str(ex.args), False
 
     return filename,True
-
-
-def replace_font(response):
-    base_font = TTFont('./fonts/base.woff')
-    # base_font.saveXML('base_font.xml')
-    base_dict = {'uniEC33': '7', 'uniF5EE': '4', 'uniEFA7': '1', 'uniEB46': '8', 'uniE57C': '9',
-                 'uniEED6': '3', 'uniF3F7': '2', 'uniF548': '6', 'uniF10C': '5', 'uniECDC': '0'}
-    base_list = base_font.getGlyphOrder()[2:]
-
-    font_file = re.findall(r'vfile\.meituan\.net\/colorstone\/(\w+\.woff)', response)[0]
-    font_url = 'http://vfile.meituan.net/colorstone/' + font_file
-
-    new_file = req_session.get(font_url)
-    with open('./fonts/' + font_file, 'wb') as f:
-        f.write(new_file.content)
-
-    new_font = TTFont('./fonts/' + font_file)
-    # new_font.saveXML('new_font.xml')
-    new_list = new_font.getGlyphOrder()[2:]
-
-    new_dict = {}
-    for name2 in new_list:
-        obj2 = new_font['glyf'][name2]
-        for name1 in base_list:
-            obj1 = base_font['glyf'][name1]
-            if obj1 == obj2:
-                new_dict[name2] = base_dict[name1]
-    try:
-        for i in new_list:
-            pattern = i.replace('uni', f'&#x').lower() + ';'
-            response = response.replace(pattern, new_dict[i])
-    except Exception as ex:
-        pass
-    finally:
-        os.remove('./fonts/' + font_file)
-    return response
 
 def FirstLevelParse(res:requests.Response,domain = "https://maoyan.com"):
     """
@@ -93,10 +57,8 @@ def PaseMovieItem(item_str:str)->Movie:
     bs = BeautifulSoup(item_str,features="html.parser")
     movie.tags = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > h3").string
     # score = bs.select_one(".movie-stats-container .score .info-num span.stonefont").string #.encode("utf-8")
-    # cumulative_sales = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-stats-container > div:nth-child(2) > div").string
-
-    # movie.score = score
-    # movie.cumulative_sales = cumulative_sales
+    # cumulative_sales = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-stats-container > div:nth-child(2) > div").text
+    # 人家有字体仿反扒技术 如要获取字体中的数据 有两种思路： 1.破解人家的字体生成算法 2. OCR 识别字体中的数据
     movie.tags = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > ul > li:nth-child(1)").string
     movie.name = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > h3").string
     movie.releasetime = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > ul > li:nth-child(3)").string
@@ -124,6 +86,7 @@ def PaseMovieItem(item_str:str)->Movie:
     movie.comments = comment_list
 
     return movie
+
 def SeconLevelParse(movies:list,score_list:list):
 
     movie_list = []
@@ -162,10 +125,54 @@ def main():
 
 
     # 数据统计分析
+def analysis_data(file:str=''):
+    from pathlib import Path
+    from collections import  Counter
+    import  jieba
+    from wordcloud import WordCloud
+    from matplotlib  import pyplot as plt
 
+    if not file:file = generatorFileName()
+    dic = {}
+    
+    path = Path(file)
+    if  not path.exists():
+        print("file is not exist")
+        exit(0)
 
-def analysis_data(file:str):
-    pass
+    with open(file,'r',encoding='utf-8')as f:
+        dic = json.load(f)
+
+    m =  Movie()
+
+    def analysize_movie(movie:Movie):
+        counter = Counter()
+        for comm in m.comments:
+            after_filter =  filter(lambda word: len(word)>=2,jieba.cut(comm['context']))
+            counter.update(after_filter)
+            
+        wordcloud = WordCloud(font_path='simsun.ttf',background_color="white").fit_words(counter)
+        plt.imshow(wordcloud)
+        plt.rcParams['font.sans-serif'] = ['SimHei']
+        plt.title(m.name)
+        plt.axis("off")
+        plt.show()
+
+    for movie in dic:
+
+        m.dict_to_object(movie)
+        analysize_movie(m)
+
 
 if __name__ == '__main__':
-    main()
+    import  sys
+    if len(sys.argv)>2:
+        action = sys.argv[2]
+    else:
+        action = input("Please enter the action crawler or analysis: ")
+    if action == "crawler":
+        main()
+    elif action == "analysis":
+        analysis_data('2019-12-12maoyan.json')
+    else:
+        print("error enter")
