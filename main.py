@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from model import Movie,Comment
-import  json,datetime
+import json,datetime
 import statistics
 
 req_session = requests.session()
@@ -52,7 +52,6 @@ def FirstLevelParse(res:requests.Response,domain = "https://maoyan.com"):
 
 
 def PaseMovieItem(item_str:str)->Movie:
-    # item_str = replace_font(item_str)
     movie = Movie()
     bs = BeautifulSoup(item_str,features="html.parser")
     movie.tags = bs.select_one("body > div.banner > div > div.celeInfo-right.clearfix > div.movie-brief-container > h3").string
@@ -87,7 +86,7 @@ def PaseMovieItem(item_str:str)->Movie:
 
     return movie
 
-def SeconLevelParse(movies:list,score_list:list):
+def SeconLevelParse(movies: list,score_list:list):
 
     movie_list = []
     cnt = 0
@@ -169,10 +168,10 @@ if __name__ == '__main__':
     if len(sys.argv)>2:
         action = sys.argv[2]
     else:
-        action = input("Please enter the action crawler or analysis: ")
+        action = input("Please enter the action crawler or analysis: ").strip()
     if action == "crawler":
         main()
     elif action == "analysis":
-        analysis_data('2019-12-12maoyan.json')
+        analysis_data()
     else:
         print("error enter")
